@@ -6,23 +6,35 @@ const bcrypt = require("bcryptjs");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+/* ---------------- MIDDLEWARE ---------------- */
 app.use(express.json());
 app.use(express.static("public"));
 
+/* ---------------- FILE PATH ---------------- */
 const USERS_FILE = path.join(__dirname, "users.json");
 
-/* ---------- helpers ---------- */
-
+/* ---------------- HELPERS ---------------- */
 function readUsers() {
-  if (!fs.existsSync(USERS_FILE)) return [];
-  return JSON.parse(fs.readFileSync(USERS_FILE, "utf8"));
+  try {
+    if (!fs.existsSync(USERS_FILE)) {
+      fs.writeFileSync(USERS_FILE, "[]");
+    }
+    return JSON.parse(fs.readFileSync(USERS_FILE, "utf8"));
+  } catch (err) {
+    console.error("READ ERROR:", err);
+    return [];
+  }
 }
 
 function writeUsers(users) {
-  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+  try {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+  } catch (err) {
+    console.error("WRITE ERROR:", err);
+  }
 }
 
-/* ---------- SIGNUP ---------- */
+/* ---------------- SIGNUP ---------------- */
 app.post("/signup", async (req, res) => {
   const { username, email, password } = req.body;
 
@@ -38,20 +50,22 @@ app.post("/signup", async (req, res) => {
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  const user = {
+  const newUser = {
     userID: "u_" + Date.now(),
     username,
     email,
     password: hashedPassword
   };
 
-  users.push(user);
+  users.push(newUser);
   writeUsers(users);
 
-  res.json({ userID: user.userID });
+  console.log("USER CREATED:", newUser.userID);
+
+  res.json({ userID: newUser.userID });
 });
 
-/* ---------- LOGIN ---------- */
+/* ---------------- LOGIN ---------------- */
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -62,20 +76,24 @@ app.post("/login", async (req, res) => {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) {
+  const ok = await bcrypt.compare(password, user.password);
+  if (!ok) {
     return res.status(401).json({ error: "Invalid credentials" });
   }
+
+  console.log("USER LOGIN:", user.userID);
 
   res.json({ userID: user.userID });
 });
 
-/* ---------- AUTO LOGIN ---------- */
+/* ---------------- AUTO LOGIN ---------------- */
 app.get("/user/:id", (req, res) => {
   const users = readUsers();
   const user = users.find(u => u.userID === req.params.id);
 
-  if (!user) return res.status(404).json({ error: "User not found" });
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
 
   res.json({
     userID: user.userID,
@@ -84,6 +102,19 @@ app.get("/user/:id", (req, res) => {
   });
 });
 
+/* ---------------- DEBUG (IMPORTANT) ---------------- */
+/*
+  OPEN THIS IN BROWSER:
+  https://your-render-url/_debug/users
+
+  This shows users.json AS IT EXISTS ON RENDER
+  (NOT GitHub)
+*/
+app.get("/_debug/users", (req, res) => {
+  res.json(readUsers());
+});
+
+/* ---------------- START SERVER ---------------- */
 app.listen(PORT, () => {
   console.log("Server running on port", PORT);
 });
