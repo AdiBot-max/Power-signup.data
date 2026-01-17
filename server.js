@@ -1,6 +1,7 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
+const bcrypt = require("bcryptjs");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,28 +11,38 @@ app.use(express.static("public"));
 
 const USERS_FILE = path.join(__dirname, "users.json");
 
+/* ---------- helpers ---------- */
+
 function readUsers() {
+  if (!fs.existsSync(USERS_FILE)) return [];
   return JSON.parse(fs.readFileSync(USERS_FILE, "utf8"));
 }
 
-function writeUsers(data) {
-  fs.writeFileSync(USERS_FILE, JSON.stringify(data, null, 2));
+function writeUsers(users) {
+  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
-// SIGNUP
-app.post("/signup", (req, res) => {
+/* ---------- SIGNUP ---------- */
+app.post("/signup", async (req, res) => {
   const { username, email, password } = req.body;
+
+  if (!username || !email || !password) {
+    return res.status(400).json({ error: "Missing fields" });
+  }
+
   const users = readUsers();
 
   if (users.find(u => u.email === email)) {
-    return res.status(400).json({ error: "User already exists" });
+    return res.status(409).json({ error: "User already exists" });
   }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
 
   const user = {
     userID: "u_" + Date.now(),
     username,
     email,
-    password
+    password: hashedPassword
   };
 
   users.push(user);
@@ -40,32 +51,39 @@ app.post("/signup", (req, res) => {
   res.json({ userID: user.userID });
 });
 
-// LOGIN
-app.post("/login", (req, res) => {
+/* ---------- LOGIN ---------- */
+app.post("/login", async (req, res) => {
   const { email, password } = req.body;
-  const users = readUsers();
 
-  const user = users.find(
-    u => u.email === email && u.password === password
-  );
+  const users = readUsers();
+  const user = users.find(u => u.email === email);
 
   if (!user) {
+    return res.status(401).json({ error: "Invalid credentials" });
+  }
+
+  const match = await bcrypt.compare(password, user.password);
+  if (!match) {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
   res.json({ userID: user.userID });
 });
 
-// AUTO LOGIN
+/* ---------- AUTO LOGIN ---------- */
 app.get("/user/:id", (req, res) => {
   const users = readUsers();
   const user = users.find(u => u.userID === req.params.id);
 
-  if (!user) return res.status(404).json({ error: "Not found" });
+  if (!user) return res.status(404).json({ error: "User not found" });
 
-  res.json(user);
+  res.json({
+    userID: user.userID,
+    username: user.username,
+    email: user.email
+  });
 });
 
-app.listen(PORT, () =>
-  console.log("Server running on port", PORT)
-);
+app.listen(PORT, () => {
+  console.log("Server running on port", PORT);
+});
