@@ -1,12 +1,30 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Signup System</title>
+  <title>Power Signup</title>
   <style>
-    body { background:#111; color:#0f0; font-family:monospace; }
-    input, button { display:block; width:100%; margin:6px 0; padding:8px; }
-    .box { max-width:300px; margin:auto; margin-top:50px; }
+    body {
+      background:#0e0e0e;
+      color:#00ffcc;
+      font-family:monospace;
+      padding:40px;
+    }
+    input, button {
+      width:100%;
+      padding:10px;
+      margin:6px 0;
+      background:#111;
+      border:1px solid #00ffcc55;
+      color:#00ffcc;
+    }
+    .box {
+      max-width:320px;
+      margin:auto;
+      background:#161616;
+      padding:20px;
+      border-radius:12px;
+    }
   </style>
 </head>
 <body>
@@ -15,43 +33,76 @@
 
 <script>
 const app = document.getElementById("app");
-const API = "";
+const USER_KEY = "userID";
 
-const userID = localStorage.getItem("userID");
+/* ---------- AUTO LOGIN ---------- */
+const savedID = localStorage.getItem(USER_KEY);
+if (savedID) autoLogin(savedID);
+else showAuth();
 
-if (userID) autoLogin();
-else showSignup();
-
-function showSignup() {
+/* ---------- UI ---------- */
+function showAuth() {
   app.innerHTML = `
-    <h3>Signup</h3>
-    <input id="u" placeholder="Username">
-    <input id="e" placeholder="Email">
-    <input id="p" type="password" placeholder="Password">
-    <button onclick="signup()">Create</button>
+    <h3>Signup / Login</h3>
+    <input id="username" placeholder="Username (signup only)">
+    <input id="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="signup()">Sign Up</button>
+    <button onclick="login()">Login</button>
   `;
 }
 
+/* ---------- SIGNUP ---------- */
 async function signup() {
-  const res = await fetch(API + "/signup", {
+  const res = await fetch("/signup", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      username: u.value,
-      email: e.value,
-      password: p.value
+      username: username.value,
+      email: email.value,
+      password: password.value
     })
   });
 
   const data = await res.json();
-
-  localStorage.setItem("userID", data.userID);
-  autoLogin();
+  if (data.userID) {
+    localStorage.setItem(USER_KEY, data.userID);
+    autoLogin(data.userID);
+  } else {
+    alert(data.error);
+  }
 }
 
-async function autoLogin() {
-  const res = await fetch(API + "/user/" + localStorage.getItem("userID"));
+/* ---------- LOGIN ---------- */
+async function login() {
+  const res = await fetch("/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: email.value,
+      password: password.value
+    })
+  });
+
+  const data = await res.json();
+  if (data.userID) {
+    localStorage.setItem(USER_KEY, data.userID);
+    autoLogin(data.userID);
+  } else {
+    alert(data.error);
+  }
+}
+
+/* ---------- AUTO LOGIN ---------- */
+async function autoLogin(id) {
+  const res = await fetch("/user/" + id);
   const user = await res.json();
+
+  if (!user.username) {
+    localStorage.removeItem(USER_KEY);
+    showAuth();
+    return;
+  }
 
   app.innerHTML = `
     <h2>Welcome ${user.username}</h2>
@@ -61,7 +112,7 @@ async function autoLogin() {
 }
 
 function logout() {
-  localStorage.removeItem("userID");
+  localStorage.removeItem(USER_KEY);
   location.reload();
 }
 </script>
