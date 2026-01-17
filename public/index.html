@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Signup System</title>
+  <style>
+    body { background:#111; color:#0f0; font-family:monospace; }
+    input, button { display:block; width:100%; margin:6px 0; padding:8px; }
+    .box { max-width:300px; margin:auto; margin-top:50px; }
+  </style>
+</head>
+<body>
+
+<div class="box" id="app">Loading...</div>
+
+<script>
+const app = document.getElementById("app");
+const API = "";
+
+const userID = localStorage.getItem("userID");
+
+if (userID) autoLogin();
+else showSignup();
+
+function showSignup() {
+  app.innerHTML = `
+    <h3>Signup</h3>
+    <input id="u" placeholder="Username">
+    <input id="e" placeholder="Email">
+    <input id="p" type="password" placeholder="Password">
+    <button onclick="signup()">Create</button>
+  `;
+}
+
+async function signup() {
+  const res = await fetch(API + "/signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: u.value,
+      email: e.value,
+      password: p.value
+    })
+  });
+
+  const data = await res.json();
+
+  localStorage.setItem("userID", data.userID);
+  autoLogin();
+}
+
+async function autoLogin() {
+  const res = await fetch(API + "/user/" + localStorage.getItem("userID"));
+  const user = await res.json();
+
+  app.innerHTML = `
+    <h2>Welcome ${user.username}</h2>
+    <p>${user.email}</p>
+    <button onclick="logout()">Logout</button>
+  `;
+}
+
+function logout() {
+  localStorage.removeItem("userID");
+  location.reload();
+}
+</script>
+
+</body>
+</html>
